@@ -1,5 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Base application colors -->
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    
+    <!-- Green accent colors -->
+    <color name="primary_green">#4CAF50</color>          <!-- Medium Green -->
+    <color name="accent_green">#8BC34A</color>           <!-- Light Green -->
+    <color name="dark_green">#2E7D32</color>             <!-- Dark Green -->
+    
+    <!-- Dark Mode UI Theme colors -->
+    <color name="background_dark">#121212</color>        <!-- Dark background -->
+    <color name="card_background">#1E1E1E</color>        <!-- Slightly lighter dark for cards -->
+    <color name="text_primary">#FFFFFF</color>           <!-- White text -->
+    <color name="text_secondary">#B3B3B3</color>         <!-- Light gray text -->
+    
+    <!-- Accent colors for different cards -->
+    <color name="accent_temperature">#4CAF50</color>     <!-- Green for temperature -->
+    <color name="accent_humidity">#81C784</color>        <!-- Light green for humidity -->
+    <color name="accent_air">#66BB6A</color>             <!-- Medium green for air quality -->
+    <color name="accent_luminosity">#A5D6A7</color>      <!-- Pale green for luminosity -->
+    <color name="accent_pressure">#388E3C</color>        <!-- Dark green for pressure -->
 </resources>
