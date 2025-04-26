@@ -2,6 +2,7 @@ package com.example.googlehack24
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.widget.TextView
@@ -12,6 +13,10 @@ import androidx.cardview.widget.CardView
 import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
+import com.google.android.gms.wearable.DataClient
+import com.google.android.gms.wearable.DataMap
+import com.google.android.gms.wearable.PutDataMapRequest
+import com.google.android.gms.wearable.Wearable
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.navigation.NavigationView
 import java.text.SimpleDateFormat
@@ -32,6 +37,9 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
     private lateinit var luminosityValueTextView: TextView
     private lateinit var pressureValueTextView: TextView
     
+    // Wearable data client
+    private lateinit var dataClient: DataClient
+    
     // Sensor values
     private var temperatureValue = 24.5f
     private var humidityValue = 65
@@ -43,6 +51,9 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         
+        // Initialize Wearable data client
+        dataClient = Wearable.getDataClient(this)
+        
         // Initialize UI components
         setupToolbar()
         setupNavigationDrawer()
@@ -50,6 +61,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         setupGardenStateView()
         setupSensorViews()
         setupCardClickListeners()
+        setupSendToWatchButton()
         
         // Initial data refresh
         refreshData()
@@ -128,6 +140,43 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         }
     }
     
+    private fun setupSendToWatchButton() {
+        findViewById<CardView>(R.id.card_send_to_watch).setOnClickListener {
+            sendDataToWatch()
+            Toast.makeText(this, "Sending data to watch...", Toast.LENGTH_SHORT).show()
+        }
+    }
+    
+    private fun sendDataToWatch() {
+        // Create a DataMap to store the sensor values
+        val gardenState = calculateGardenState()
+        val putDataMapReq = PutDataMapRequest.create("/garden_data").apply {
+            dataMap.apply {
+                putString("garden_state", gardenState)
+                putFloat("temperature", temperatureValue)
+                putInt("humidity", humidityValue)
+                putInt("air_quality", airQualityValue)
+                putInt("luminosity", luminosityValue)
+                putInt("pressure", pressureValue)
+                putLong("timestamp", System.currentTimeMillis())
+            }
+        }
+        
+        // Log the data before sending
+        Log.d("SendData", "Sending data: garden_state=$gardenState, temperature=$temperatureValue, humidity=$humidityValue, air_quality=$airQualityValue, luminosity=$luminosityValue, pressure=$pressureValue, timestamp=${System.currentTimeMillis()}")
+        
+        val putDataReq = putDataMapReq.asPutDataRequest().setUrgent()
+        
+        // Send the data
+        dataClient.putDataItem(putDataReq)
+            .addOnSuccessListener {
+                Toast.makeText(this, "Data sent successfully to watch", Toast.LENGTH_SHORT).show()
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(this, "Failed to send data: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+    }
+    
     private fun refreshData() {
         // Update last updated timestamp
         val dateFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
@@ -136,7 +185,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         
         // In a real app, this would fetch data from the sensor
         // For now, we'll just use the stored values
-        temperatureValueTextView.text = "${temperatureValue}°C"
+        temperatureValueTextView.text = String.format(Locale.getDefault(), "%.1f°C", temperatureValue)
         humidityValueTextView.text = "$humidityValue%"
         updateAirQualityText()
         luminosityValueTextView.text = "$luminosityValue lux"
