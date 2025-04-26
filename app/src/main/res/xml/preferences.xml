@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory
+        android:title="Sensor Thresholds"
+        app:iconSpaceReserved="false">
+
+        <!-- Temperature Thresholds -->
+        <SeekBarPreference
+            android:defaultValue="30"
+            android:key="max_temperature"
+            android:max="50"
+            android:min="0"
+            android:title="Maximum Temperature"
+            app:iconSpaceReserved="false" />
+
+        <SeekBarPreference
+            android:defaultValue="15"
+            android:key="min_temperature"
+            android:max="30"
+            android:min="-10"
+            android:title="Minimum Temperature"
+            app:iconSpaceReserved="false" />
+
+        <!-- Humidity Thresholds -->
+        <SeekBarPreference
+            android:defaultValue="70"
+            android:key="max_humidity"
+            android:max="100"
+            android:min="0"
+            android:title="Maximum Humidity"
+            app:iconSpaceReserved="false" />
+
+        <SeekBarPreference
+            android:defaultValue="30"
+            android:key="min_humidity"
+            android:max="100"
+            android:min="0"
+            android:title="Minimum Humidity"
+            app:iconSpaceReserved="false" />
+
+        <!-- Air Quality Thresholds -->
+        <SeekBarPreference
+            android:defaultValue="150"
+            android:key="max_air_quality"
+            android:max="500"
+            android:min="0"
+            android:title="Maximum Air Quality"
+            app:iconSpaceReserved="false" />
+
+        <SeekBarPreference
+            android:defaultValue="50"
+            android:key="min_air_quality"
+            android:max="200"
+            android:min="0"
+            android:title="Minimum Air Quality"
+            app:iconSpaceReserved="false" />
+
+        <!-- Pressure Thresholds -->
+        <SeekBarPreference
+            android:defaultValue="1030"
+            android:key="max_pressure"
+            android:max="1100"
+            android:min="950"
+            android:title="Maximum Pressure"
+            app:iconSpaceReserved="false" />
+
+        <SeekBarPreference
+            android:defaultValue="980"
+            android:key="min_pressure"
+            android:max="1050"
+            android:min="900"
+            android:title="Minimum Pressure"
+            app:iconSpaceReserved="false" />
+
+        <!-- Luminosity Thresholds -->
+        <SeekBarPreference
+            android:defaultValue="8000"
+            android:key="max_luminosity"
+            android:max="10000"
+            android:min="0"
+            android:title="Maximum Luminosity"
+            app:iconSpaceReserved="false" />
+
+        <SeekBarPreference
+            android:defaultValue="200"
+            android:key="min_luminosity"
+            android:max="5000"
+            android:min="0"
+            android:title="Minimum Luminosity"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="Account"
+        app:iconSpaceReserved="false">
+
+        <Preference
+            android:key="logout"
+            android:title="Logout"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>
