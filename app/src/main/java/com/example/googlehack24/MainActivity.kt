@@ -1,6 +1,9 @@
 package com.example.googlehack24
 
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Bundle
 import android.util.Log
 import android.view.Menu
@@ -13,8 +16,9 @@ import androidx.cardview.widget.CardView
 import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
+import com.example.googlehack24.service.WatchDataListenerService
+import com.google.android.gms.wearable.CapabilityClient
 import com.google.android.gms.wearable.DataClient
-import com.google.android.gms.wearable.DataMap
 import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
 import com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -37,8 +41,9 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
     private lateinit var luminosityValueTextView: TextView
     private lateinit var pressureValueTextView: TextView
     
-    // Wearable data client
+    // Wearable clients
     private lateinit var dataClient: DataClient
+    private lateinit var capabilityClient: CapabilityClient
     
     // Sensor values
     private var temperatureValue = 24.5f
@@ -47,12 +52,42 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
     private var luminosityValue = 8500
     private var pressureValue = 1013
     
+    // BroadcastReceiver for garden data updates from watch
+    private val gardenDataReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == "com.example.googlehack24.GARDEN_DATA_UPDATED") {
+                // Update UI with values from watch if needed
+                val gardenState = intent.getStringExtra("garden_state")
+                val temperature = intent.getFloatExtra("temperature", -1f)
+                val humidity = intent.getIntExtra("humidity", -1)
+                val airQuality = intent.getIntExtra("air_quality", -1)
+                val luminosity = intent.getIntExtra("luminosity", -1)
+                val pressure = intent.getIntExtra("pressure", -1)
+                
+                Log.d("MainActivity", "Received garden data from watch: garden_state=$gardenState, " +
+                       "temperature=$temperature, humidity=$humidity")
+                
+                Toast.makeText(context, "Received data from watch", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         
-        // Initialize Wearable data client
+        // Initialize Wearable clients
         dataClient = Wearable.getDataClient(this)
+        capabilityClient = Wearable.getCapabilityClient(this)
+        
+        // Register the capability name
+        capabilityClient.addLocalCapability(WatchDataListenerService.CAPABILITY_GARDEN_SENSORS)
+            .addOnSuccessListener { 
+                Log.d("MainActivity", "Successfully registered capability") 
+            }
+            .addOnFailureListener { e ->
+                Log.e("MainActivity", "Failed to register capability", e)
+            }
         
         // Initialize UI components
         setupToolbar()
@@ -65,6 +100,26 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         
         // Initial data refresh
         refreshData()
+        
+        // Register BroadcastReceiver for watch data updates
+        registerReceiver(gardenDataReceiver, IntentFilter("com.example.googlehack24.GARDEN_DATA_UPDATED"))
+    }
+    
+    override fun onDestroy() {
+        // Unregister the receiver
+        try {
+            unregisterReceiver(gardenDataReceiver)
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error unregistering receiver", e)
+        }
+        
+        // Remove the capability when app is closed
+        capabilityClient.removeLocalCapability(WatchDataListenerService.CAPABILITY_GARDEN_SENSORS)
+            .addOnFailureListener { e ->
+                Log.e("MainActivity", "Failed to remove capability", e)
+            }
+        
+        super.onDestroy()
     }
     
     private fun setupToolbar() {
@@ -107,36 +162,31 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
     private fun setupSensorViews() {
         temperatureValueTextView = findViewById(R.id.tv_temperature_value)
         humidityValueTextView = findViewById(R.id.tv_humidity_value)
-        airQualityValueTextView = findViewById(R.id.tv_air_value)
+        airQualityValueTextView = findViewById(R.id.tv_air_quality_value)
         luminosityValueTextView = findViewById(R.id.tv_luminosity_value)
         pressureValueTextView = findViewById(R.id.tv_pressure_value)
     }
     
     private fun setupCardClickListeners() {
-        // Set up simple click listeners for cards
+        // Set click listeners for the sensor cards to show detailed info
         findViewById<CardView>(R.id.card_temperature).setOnClickListener {
-            Toast.makeText(this, "Temperature data", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Temperature: $temperatureValue°C", Toast.LENGTH_SHORT).show()
         }
         
         findViewById<CardView>(R.id.card_humidity).setOnClickListener {
-            Toast.makeText(this, "Humidity data", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Humidity: $humidityValue%", Toast.LENGTH_SHORT).show()
         }
         
-        findViewById<CardView>(R.id.card_air).setOnClickListener {
-            Toast.makeText(this, "Air quality data", Toast.LENGTH_SHORT).show()
+        findViewById<CardView>(R.id.card_air_quality).setOnClickListener {
+            Toast.makeText(this, "Air Quality: $airQualityValue AQI", Toast.LENGTH_SHORT).show()
         }
         
         findViewById<CardView>(R.id.card_luminosity).setOnClickListener {
-            Toast.makeText(this, "Luminosity data", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Luminosity: $luminosityValue lux", Toast.LENGTH_SHORT).show()
         }
         
         findViewById<CardView>(R.id.card_pressure).setOnClickListener {
-            Toast.makeText(this, "Pressure data", Toast.LENGTH_SHORT).show()
-        }
-        
-        // Garden state card info message
-        findViewById<CardView>(R.id.card_garden_state).setOnClickListener {
-            Toast.makeText(this, "Garden state is calculated from sensor values", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Pressure: $pressureValue hPa", Toast.LENGTH_SHORT).show()
         }
     }
     
@@ -150,7 +200,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
     private fun sendDataToWatch() {
         // Create a DataMap to store the sensor values
         val gardenState = calculateGardenState()
-        val putDataMapReq = PutDataMapRequest.create("/garden_data").apply {
+        val putDataMapReq = PutDataMapRequest.create(WatchDataListenerService.GARDEN_DATA_PATH).apply {
             dataMap.apply {
                 putString("garden_state", gardenState)
                 putFloat("temperature", temperatureValue)
@@ -174,156 +224,104 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
             }
             .addOnFailureListener { e ->
                 Toast.makeText(this, "Failed to send data: ${e.message}", Toast.LENGTH_SHORT).show()
+                Log.e("SendData", "Failed to send data", e)
             }
     }
     
     private fun refreshData() {
-        // Update last updated timestamp
-        val dateFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
-        val currentTime = dateFormat.format(Date())
-        lastUpdatedTextView.text = "Last updated: $currentTime"
+        // Generate new random sensor data
+        generateRandomSensorData()
         
-        // In a real app, this would fetch data from the sensor
-        // For now, we'll just use the stored values
+        // Update the UI with new values
         temperatureValueTextView.text = String.format(Locale.getDefault(), "%.1f°C", temperatureValue)
         humidityValueTextView.text = "$humidityValue%"
+        airQualityValueTextView.text = "$airQualityValue AQI"
         updateAirQualityText()
         luminosityValueTextView.text = "$luminosityValue lux"
         pressureValueTextView.text = "$pressureValue hPa"
-
-        // Update garden state based on current values
-        updateGardenState(calculateGardenState())
-
-        // Check if the garden state is good or bad and inform the user
-        val isGardenHealthy = isGardenHealthy(calculateGardenState())
-        if (!isGardenHealthy) {
-            Toast.makeText(this, "Warning: Your garden needs attention!", Toast.LENGTH_LONG).show()
-        }
+        
+        // Calculate and update garden state
+        val gardenState = calculateGardenState()
+        updateGardenState(gardenState)
+        
+        // Update the last updated timestamp
+        val dateFormat = SimpleDateFormat("MMM dd, HH:mm:ss", Locale.getDefault())
+        val currentTimeString = dateFormat.format(Date())
+        lastUpdatedTextView.text = "Last updated: $currentTimeString"
     }
 
     private fun updateAirQualityText() {
-        // Determine air quality status based on AQI value
-        val airStatus = when {
-            airQualityValue <= 50 -> "Good"
-            airQualityValue <= 100 -> "Moderate"
-            airQualityValue <= 150 -> "Unhealthy (Sensitive)"
-            airQualityValue <= 200 -> "Unhealthy"
-            airQualityValue <= 300 -> "Very Unhealthy"
-            else -> "Hazardous"
+        // Set text color based on air quality value
+        val color = when {
+            airQualityValue < 50 -> ContextCompat.getColor(this, R.color.good_state)
+            airQualityValue < 100 -> ContextCompat.getColor(this, R.color.moderate_state)
+            else -> ContextCompat.getColor(this, R.color.bad_state)
         }
-
-        airQualityValueTextView.text = "$airStatus ($airQualityValue AQI)"
+        airQualityValueTextView.setTextColor(color)
     }
 
     private fun calculateGardenState(): String {
-        // This is a simple calculation for demonstration
-        // In a real app, you would use more complex logic based on plant needs
-
-        var scoreCount = 0
-        var totalScore = 0
-
-        // Temperature score (15-30°C is optimal)
-        if (temperatureValue in 15.0f..30.0f) {
-            totalScore += 3
-        } else if (temperatureValue in 5.0f..35.0f) {
-            totalScore += 2
-        } else {
-            totalScore += 1
-        }
-        scoreCount++
-
-        // Humidity score (40-70% is optimal)
-        if (humidityValue in 40..70) {
-            totalScore += 3
-        } else if (humidityValue in 20..90) {
-            totalScore += 2
-        } else {
-            totalScore += 1
-        }
-        scoreCount++
-
-        // Air quality score
-        if (airQualityValue <= 50) {
-            totalScore += 3
-        } else if (airQualityValue <= 100) {
-            totalScore += 2
-        } else {
-            totalScore += 1
-        }
-        scoreCount++
-
-        // Luminosity score depends on plant type, using a general range
-        if (luminosityValue in 3000..10000) {
-            totalScore += 3
-        } else if (luminosityValue in 1000..15000) {
-            totalScore += 2
-        } else {
-            totalScore += 1
-        }
-        scoreCount++
-
-        // Calculate average score
-        val averageScore = totalScore.toFloat() / scoreCount
-
+        val appLogic = AppLogic()
+        
+        // Calculate garden state based on sensor values
+        val tempOptimal = appLogic.isTemperatureOptimal(temperatureValue)
+        val humidityOptimal = appLogic.isHumidityOptimal(humidityValue)
+        val airQualityOptimal = airQualityValue < 50
+        val luminosityOptimal = luminosityValue in 2000..20000
+        val pressureOptimal = pressureValue in 980..1050
+        
+        val optimalCount = listOf(tempOptimal, humidityOptimal, airQualityOptimal, luminosityOptimal, pressureOptimal)
+            .count { it }
+        
         return when {
-            averageScore >= 2.8 -> "VERY GOOD"
-            averageScore >= 2.3 -> "GOOD"
-            averageScore >= 1.8 -> "OK"
-            averageScore >= 1.3 -> "BAD"
+            optimalCount == 5 -> "VERY GOOD"
+            optimalCount == 4 -> "GOOD"
+            optimalCount == 3 -> "OK"
+            optimalCount == 2 -> "BAD"
             else -> "VERY BAD"
         }
     }
 
     private fun isGardenHealthy(state: String): Boolean {
-        return when (state) {
-            "VERY GOOD", "GOOD" -> true
-            "OK", "BAD", "VERY BAD" -> false
-            else -> false
-        }
+        return AppLogic().evaluateGardenHealth(state)
     }
 
     private fun generateRandomSensorData() {
-        // Generate random values within realistic ranges
-        temperatureValue = Random.nextFloat() * 40 - 5  // Range: -5 to 35°C
-        humidityValue = Random.nextInt(0, 101)          // Range: 0-100%
-        airQualityValue = Random.nextInt(0, 301)        // Range: 0-300 AQI
-        luminosityValue = Random.nextInt(0, 20001)      // Range: 0-20000 lux
-        pressureValue = Random.nextInt(950, 1051)       // Range: 950-1050 hPa
-
-        // Update UI with random values
-        refreshData()
-
-        // Notify user
-        Toast.makeText(this, "Random sensor data generated", Toast.LENGTH_SHORT).show()
+        // Generate random values for sensors within realistic ranges
+        temperatureValue = Random.nextDouble(10.0, 35.0).toFloat()
+        humidityValue = Random.nextInt(30, 80)
+        airQualityValue = Random.nextInt(10, 150)
+        luminosityValue = Random.nextInt(500, 30000)
+        pressureValue = Random.nextInt(970, 1060)
     }
 
     private fun updateGardenState(state: String) {
         gardenStateTextView.text = state
-
-        // Set the color based on the state
+        
+        // Set text color based on garden state
         val color = when (state) {
-            "VERY GOOD" -> R.color.primary_green
-            "GOOD" -> R.color.accent_temperature
-            "OK" -> R.color.accent_luminosity
-            "BAD" -> R.color.accent_humidity
-            "VERY BAD" -> android.R.color.holo_red_dark
-            else -> R.color.text_primary
+            "VERY GOOD" -> ContextCompat.getColor(this, R.color.very_good_state)
+            "GOOD" -> ContextCompat.getColor(this, R.color.good_state)
+            "OK" -> ContextCompat.getColor(this, R.color.moderate_state)
+            "BAD" -> ContextCompat.getColor(this, R.color.bad_state)
+            else -> ContextCompat.getColor(this, R.color.very_bad_state)
         }
-
-        gardenStateTextView.setTextColor(ContextCompat.getColor(this, color))
+        gardenStateTextView.setTextColor(color)
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.menu_main, menu)
+        menuInflater.inflate(R.menu.main_menu, menu)
         return true
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             R.id.action_settings -> {
-                // Navigate to settings activity
-                val intent = Intent(this, SettingsActivity::class.java)
-                startActivity(intent)
+                startActivity(Intent(this, SettingsActivity::class.java))
+                true
+            }
+            R.id.action_profile -> {
+                startActivity(Intent(this, ProfileActivity::class.java))
                 true
             }
             else -> super.onOptionsItemSelected(item)
@@ -333,31 +331,19 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
     override fun onNavigationItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             R.id.nav_home -> {
-                // Already on home
+                // Already on home, just close drawer
             }
             R.id.nav_settings -> {
-                val intent = Intent(this, SettingsActivity::class.java)
-                startActivity(intent)
-            }
-            R.id.nav_history -> {
-                // Navigate to history page
-                Toast.makeText(this, "History", Toast.LENGTH_SHORT).show()
+                startActivity(Intent(this, SettingsActivity::class.java))
             }
             R.id.nav_profile -> {
-                // Fix: Proper intent creation for ProfileActivity
-                val intent = Intent(this, ProfileActivity::class.java)
-                startActivity(intent)
+                startActivity(Intent(this, ProfileActivity::class.java))
             }
-            R.id.nav_logout -> {
-                // Handle logout
-                Toast.makeText(this, "Logging out...", Toast.LENGTH_SHORT).show()
-            }
-            R.id.nav_random_data -> {
-                // Generate random data
-                generateRandomSensorData()
+            R.id.nav_about -> {
+                Toast.makeText(this, "About Garden Monitor App v1.0", Toast.LENGTH_SHORT).show()
             }
         }
-
+        
         drawerLayout.closeDrawer(GravityCompat.START)
         return true
     }
