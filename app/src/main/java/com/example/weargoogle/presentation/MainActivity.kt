@@ -5,7 +5,12 @@
 
 package com.example.weargoogle.presentation
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -27,17 +32,51 @@ import androidx.wear.compose.material.TimeText
 
 import com.example.weargoogle.R
 import com.example.weargoogle.presentation.theme.WeargoogleTheme
+import com.example.weargoogle.service.WatchDataListenerService
 
 class MainActivity : ComponentActivity() {
+    
+    private lateinit var viewModel: AgriViewModel
+    
+    private val sensorDataReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == WatchDataListenerService.ACTION_SENSOR_DATA_RECEIVED) {
+                // Get sensor values from intent
+                val temperature = intent.getIntExtra(WatchDataListenerService.KEY_TEMPERATURE, 0)
+                val humidity = intent.getIntExtra(WatchDataListenerService.KEY_HUMIDITY, 0)
+                val airQuality = intent.getIntExtra(WatchDataListenerService.KEY_AIR_QUALITY, 0)
+                val luminosity = intent.getIntExtra(WatchDataListenerService.KEY_LUMINOSITY, 0)
+                val pressure = intent.getIntExtra(WatchDataListenerService.KEY_PRESSURE, 0)
+                
+                // Update view model with values from watch
+                viewModel.updateSensorValue("temperature", temperature)
+                viewModel.updateSensorValue("humidity", humidity)
+                viewModel.updateSensorValue("airquality", airQuality)
+                viewModel.updateSensorValue("luminosity", luminosity)
+                viewModel.updateSensorValue("pressure", pressure)
+                
+                // Notify user
+                Toast.makeText(context, "Data received from watch", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
 
         super.onCreate(savedInstanceState)
 
         setTheme(android.R.style.Theme_DeviceDefault)
+        
+        // Register receiver for watch data with RECEIVER_NOT_EXPORTED flag
+        registerReceiver(
+            sensorDataReceiver,
+            IntentFilter(WatchDataListenerService.ACTION_SENSOR_DATA_RECEIVED),
+            Context.RECEIVER_NOT_EXPORTED
+        )
 
         setContent {
-            val viewModel = AgriViewModel()
+            viewModel = AgriViewModel()
             val humidity by viewModel.getHumidity().collectAsState()
             val temperature by viewModel.getTemperature().collectAsState()
             val pressure by viewModel.getPressure().collectAsState()
@@ -45,7 +84,7 @@ class MainActivity : ComponentActivity() {
             val airQuality by viewModel.getAirQuality().collectAsState()
             val gardenState by viewModel.getGardenState().collectAsState()
 
-            // Test data
+            // Initial test data (will be replaced with actual watch data)
             viewModel.updateSensorValue("temperature", 25)
             viewModel.updateSensorValue("humidity", 60)
             viewModel.updateSensorValue("pressure", 1013)
@@ -61,5 +100,11 @@ class MainActivity : ComponentActivity() {
                 gardenState = gardenState
             )
         }
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        // Unregister the receiver when the activity is destroyed
+        unregisterReceiver(sensorDataReceiver)
     }
 }

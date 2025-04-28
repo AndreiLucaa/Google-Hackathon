@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.BODY_SENSORS" />
+    <uses-permission android:name="android.permission.BODY_SENSORS_BACKGROUND" />
 
     <uses-feature android:name="android.hardware.type.watch" />
 
@@ -22,6 +24,11 @@
         <meta-data
             android:name="com.google.android.wearable.standalone"
             android:value="true" />
+            
+        <!-- Add the capability metadata that references our wearable manifest -->
+        <meta-data
+            android:name="com.google.android.wearable.capability"
+            android:resource="@xml/wearable_app_manifest" />
 
         <activity
             android:name=".presentation.MainActivity"
@@ -30,10 +37,25 @@
             android:theme="@style/MainActivityTheme.Starting">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        
+        <service
+            android:name=".service.WatchDataListenerService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <data android:scheme="wear" android:host="*" android:path="/sensor-data" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data android:scheme="wear" android:host="*" android:path="/sensor-data" />
+            </intent-filter>
+            <!-- Removing the deprecated BIND_LISTENER action as it's no longer needed.
+                 The DATA_CHANGED and MESSAGE_RECEIVED actions are sufficient -->
+        </service>
+        
     </application>
 
 </manifest>

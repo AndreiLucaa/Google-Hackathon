@@ -55,4 +55,8 @@ dependencies {
     androidTestImplementation(libs.ui.test.junit4)
     debugImplementation(libs.ui.tooling)
     debugImplementation(libs.ui.test.manifest)
+    
+    // Wear OS communication
+    implementation("androidx.wear:wear-remote-interactions:1.0.0")
+    implementation("com.google.android.gms:play-services-wearable:18.1.0")
 }
